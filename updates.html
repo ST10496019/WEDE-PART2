@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>SoccerHub - Updates</title>
+    <link rel="stylesheet" href="css/style.css">
+  </head>
+  <body>
+    <div class="hamburger" id="hamburger" aria-label="Open menu">☰</div>
+    <div class="sidebar" id="sidebar">
+      <h2 class="brand">SoccerHub</h2>
+  <div id="sidebarWallet" class="small muted" style="margin:6px 0">Not logged in</div>
+      <nav>
+        <a href="index.html">Home</a>
+        <a href="matches.html">Matches</a>
+        <a href="updates.html">Updates</a>
+        <a href="mybets.html">My Bets</a>
+        <a href="account.html">Account</a>
+      </nav>
+    </div>
+
+    <main class="main">
+      <h1>League Updates & Past Results</h1>
+
+      <div class="panel">
+        <h3>League updates (read-only)</h3>
+        <p class="muted">This page shows recent news and past results for PSL, EPL and LaLiga. Entries are read-only; to edit data use the developer tools or the updates admin interface.</p>
+      </div>
+
+      <div class="panel">
+        <h3>Recent updates</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px">
+          <div>
+            <h4>PSL</h4>
+            <div id="pslList"></div>
+          </div>
+          <div>
+            <h4>EPL</h4>
+            <div id="eplList"></div>
+          </div>
+          <div>
+            <h4>LaLiga</h4>
+            <div id="laligaList"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>League tables 2025/26</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+          <div>
+            <h4>PSL - 2025/26</h4>
+            <div id="pslTable"></div>
+          </div>
+          <div>
+            <h4>EPL - 2025/26</h4>
+            <div id="eplTable"></div>
+          </div>
+          <div>
+            <h4>LaLiga - 2025/26</h4>
+            <div id="laligaTable"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Past matches (recent)</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+          <div>
+            <h4>PSL recent</h4>
+            <div id="pslMatches"></div>
+          </div>
+          <div>
+            <h4>EPL recent</h4>
+            <div id="eplMatches"></div>
+          </div>
+          <div>
+            <h4>LaLiga recent</h4>
+            <div id="laligaMatches"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>Latest transfer news</h3>
+        <p class="muted">Recent transfer headlines across PSL, EPL and LaLiga (read-only).</p>
+        <div style="margin-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+          <button class="btn" onclick="setTransferFilter('ALL')">All</button>
+          <button class="btn" onclick="setTransferFilter('PSL')">PSL</button>
+          <button class="btn" onclick="setTransferFilter('EPL')">EPL</button>
+          <button class="btn" onclick="setTransferFilter('LaLiga')">LaLiga</button>
+        </div>
+        <div id="transfersList" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px"></div>
+      </div>
+      </div>
+
+      <div class="panel">
+        <h3>Activity log (read-only)</h3>
+        <ul id="activityLog"></ul>
+      </div>
+
+    </main>
+
+    <script>
+      /*
+        updates.html - read-only updates and league tables viewer
+
+        Responsibilities:
+        - Seed demo league tables and recent matches if missing
+        - Render recent updates, league tables and past matches
+        - Show transfer items with small team logo mapping
+        - Provide simple filters for transfer list
+      */
+
+      // Read persisted 'updates' data (if any)
+      function getUpdates(){ try{ return JSON.parse(localStorage.getItem('updates')||'{}'); }catch(e){return{}} }
+
+      // Seed demo data for 2025/26 tables and recent matches when not present
+      function seedTablesAndMatches(){
+        try{ var tbls = JSON.parse(localStorage.getItem('tables')||'{}'); }catch(e){ tbls = {}; }
+        var changed = false;
+        if(!tbls.PSL){
+          tbls.PSL = [
+            {pos:1,team:'Mamelodi Sundowns',pts:68,gd:32,played:34},
+            {pos:2,team:'Kaizer Chiefs',pts:60,gd:20,played:34},
+            {pos:3,team:'Orlando Pirates',pts:55,gd:15,played:34},
+            {pos:4,team:'SuperSport United',pts:50,gd:10,played:34}
+          ]; changed=true;
+        }
+        if(!tbls.EPL){
+          tbls.EPL = [
+            {pos:1,team:'Manchester City',pts:86,gd:57,played:38},
+            {pos:2,team:'Arsenal',pts:78,gd:44,played:38},
+            {pos:3,team:'Liverpool',pts:74,gd:38,played:38},
+            {pos:4,team:'Manchester United',pts:68,gd:22,played:38}
+          ]; changed=true;
+        }
+        if(!tbls.LaLiga){
+          tbls.LaLiga = [
+            {pos:1,team:'Barcelona',pts:82,gd:45,played:38},
+            {pos:2,team:'Real Madrid',pts:78,gd:40,played:38},
+            {pos:3,team:'Atletico Madrid',pts:67,gd:25,played:38},
+            {pos:4,team:'Sevilla',pts:62,gd:18,played:38}
+          ]; changed=true;
+        }
+        if(changed) localStorage.setItem('tables', JSON.stringify(tbls));
+
+        try{ var matches = JSON.parse(localStorage.getItem('recentMatches')||'{}'); }catch(e){ matches = {}; }
+        var mchChanged = false;
+        if(!matches.PSL){
+          matches.PSL = [
+            {date:'2025-09-20',home:'Mamelodi Sundowns',away:'Kaizer Chiefs',score:'2-1'},
+            {date:'2025-09-19',home:'Orlando Pirates',away:'SuperSport United',score:'1-1'}
+          ]; mchChanged=true;
+        }
+        if(!matches.EPL){
+          matches.EPL = [
+            {date:'2025-09-21',home:'Manchester United',away:'Arsenal',score:'3-2'},
+            {date:'2025-09-20',home:'Manchester City',away:'Liverpool',score:'2-2'}
+          ]; mchChanged=true;
+        }
+        if(!matches.LaLiga){
+          matches.LaLiga = [
+            {date:'2025-09-21',home:'Barcelona',away:'Real Madrid',score:'1-0'},
+            {date:'2025-09-19',home:'Atletico Madrid',away:'Sevilla',score:'0-0'}
+          ]; mchChanged=true;
+        }
+        if(mchChanged) localStorage.setItem('recentMatches', JSON.stringify(matches));
+      }
+
+      // renderUpdates: render headline updates lists, activity log, tables and recent matches
+      function renderUpdates(){
+        var u = getUpdates();
+        function renderList(id, arr){
+          var el = document.getElementById(id); el.innerHTML='';
+          (arr||[]).slice(0,20).forEach(function(it){
+            var card = document.createElement('div'); card.className='panel';
+            var title = document.createElement('div'); title.style.fontWeight='700'; title.textContent = it.title || '';
+            var meta = document.createElement('div'); meta.className='muted'; meta.style.marginTop='6px'; meta.textContent = (it.score?('Score: '+it.score+' • '):'') + (new Date(it.ts)).toLocaleString();
+            card.appendChild(title); card.appendChild(meta); el.appendChild(card);
+          });
+        }
+        renderList('pslList', u.PSL);
+        renderList('eplList', u.EPL);
+        renderList('laligaList', u.LaLiga);
+
+        var logs = JSON.parse(localStorage.getItem('activityLog')||'[]');
+        var logEl = document.getElementById('activityLog'); logEl.innerHTML='';
+        logs.slice(0,50).forEach(function(l){ var li=document.createElement('li'); li.className='panel'; li.textContent = l.msg + ' • ' + (new Date(l.ts)).toLocaleString(); logEl.appendChild(li); });
+
+        renderTables();
+        renderRecentMatches();
+      }
+
+  // renderTables: build simple table elements for each league table stored in localStorage
+  function renderTables(){
+        var t = JSON.parse(localStorage.getItem('tables')||'{}');
+        function mkTable(id, arr){
+          var el = document.getElementById(id); el.innerHTML='';
+          var table = document.createElement('table'); table.style.width='100%'; table.style.borderCollapse='collapse';
+          var thead = document.createElement('tr'); ['#','Team','P','GD','Pts'].forEach(function(h){ var th=document.createElement('th'); th.textContent=h; th.style.textAlign='left'; th.style.padding='8px'; th.style.color='var(--muted)'; table.appendChild(th); });
+          (arr||[]).forEach(function(r){ var tr=document.createElement('tr'); tr.className='panel'; tr.style.display='table-row'; tr.style.margin='0'; tr.style.padding='6px';
+            var tdPos=document.createElement('td'); tdPos.textContent = r.pos; tdPos.style.padding='6px';
+            var tdTeam=document.createElement('td'); tdTeam.textContent = r.team; tdTeam.style.padding='6px';
+            var tdP=document.createElement('td'); tdP.textContent = r.played; tdP.style.padding='6px';
+            var tdGD=document.createElement('td'); tdGD.textContent = r.gd; tdGD.style.padding='6px';
+            var tdPts=document.createElement('td'); tdPts.textContent = r.pts; tdPts.style.padding='6px';
+            tr.appendChild(tdPos); tr.appendChild(tdTeam); tr.appendChild(tdP); tr.appendChild(tdGD); tr.appendChild(tdPts); table.appendChild(tr);
+          });
+          el.appendChild(table);
+        }
+        mkTable('pslTable', t.PSL);
+        mkTable('eplTable', t.EPL);
+        mkTable('laligaTable', t.LaLiga);
+      }
+
+  // renderRecentMatches: render small cards for recent past matches stored in recentMatches
+  function renderRecentMatches(){
+        var m = JSON.parse(localStorage.getItem('recentMatches')||'{}');
+        function mkList(id, arr){ var el=document.getElementById(id); el.innerHTML=''; (arr||[]).forEach(function(it){ var card=document.createElement('div'); card.className='panel'; var title=document.createElement('div'); title.style.fontWeight='700'; title.textContent = it.home + ' v ' + it.away; var meta=document.createElement('div'); meta.className='muted'; meta.textContent = it.score + ' • ' + (new Date(it.date)).toLocaleDateString(); card.appendChild(title); card.appendChild(meta); el.appendChild(card); }); }
+        mkList('pslMatches', m.PSL);
+        mkList('eplMatches', m.EPL);
+        mkList('laligaMatches', m.LaLiga);
+      }
+
+  // seed data and render
+  seedTablesAndMatches();
+  // transfer utilities
+  var transferFilter = 'ALL';
+  function setTransferFilter(v){ transferFilter = v; renderTransfers(); }
+
+  // small mapping from known teams to images in /img (used when rendering transfers)
+  var logoMap = {
+        'PSG':'img/PSG-Logo.png', 'REAL MADRID':'img/REAL M.png', 'REAL M':'img/REAL M.png',
+        'MANCHESTER UNITED':'img/MAN U.png', 'MAN UNITED':'img/MAN U.png', 'MAN U':'img/MAN U.png',
+        'BM':'img/BM.png', 'BC FC':'img/BC FC.png', 'SUN DOWNS':'img/Updated-Sundowns-Logo.png', 'SUNDOWNS':'img/Updated-Sundowns-Logo.png', 'SUNDOWNS FC':'img/Updated-Sundowns-Logo.png'
+      };
+
+      // ensureTransfers: seed demo transfer headlines when none exist
+      (function ensureTransfers(){
+        try{ var tr = JSON.parse(localStorage.getItem('transfers')||'[]'); }catch(e){ tr = []; }
+        if(!tr.length){
+          tr = [
+            {league:'EPL',title:'Manchester City sign Left Back',note:'City complete signing from Barcelona',team:'Manchester City',img:'',ts:new Date().toISOString()},
+            {league:'LaLiga',title:'Barcelona close on striker',note:'Deal expected in next 48 hours',team:'Barcelona',img:'',ts:new Date().toISOString()},
+            {league:'PSL',title:'Sundowns poach young midfielder',note:'Long-term contract signed',team:'Mamelodi Sundowns',img:'',ts:new Date().toISOString()}
+          ];
+          localStorage.setItem('transfers', JSON.stringify(tr));
+        }
+      })();
+
+  // renderTransfers: build cards for each transfer and apply the current transferFilter
+  function renderTransfers(){
+        var tr = JSON.parse(localStorage.getItem('transfers')||'[]');
+        var el = document.getElementById('transfersList'); el.innerHTML='';
+        tr.filter(function(t){ return transferFilter==='ALL' || t.league===transferFilter; }).forEach(function(t){
+          var card=document.createElement('div'); card.className='panel'; card.style.display='flex'; card.style.alignItems='center'; card.style.gap='10px';
+          var imgEl=document.createElement('img');
+          var key = (t.team||t.title||'').toString().toUpperCase();
+          imgEl.src = logoMap[key] || t.img || 'img/BC FC.png';
+          imgEl.style.width='54px'; imgEl.style.height='54px'; imgEl.style.objectFit='cover'; imgEl.style.borderRadius='8px';
+          var b=document.createElement('div'); var title=document.createElement('div'); title.style.fontWeight='700'; title.textContent = t.title; var note=document.createElement('div'); note.className='muted'; note.textContent = t.note + ' • ' + (new Date(t.ts)).toLocaleDateString(); b.appendChild(title); b.appendChild(note);
+          card.appendChild(imgEl); card.appendChild(b); el.appendChild(card);
+        });
+      }
+
+  // initial render: updates and transfers
+  renderUpdates();
+  renderTransfers();
+    </script>
+
+    <script>
+      // No dedicated mobile wallet UI on this page; the sidebar updater below sets balances
+    </script>
+
+    <script>
+      // Sidebar wallet updater and small-screen hamburger toggle (per-page helpers)
+      (function(){ try{ var s=JSON.parse(localStorage.getItem('session')||'null'); var w=JSON.parse(localStorage.getItem('wallets')||'{}'); var el=document.getElementById('sidebarWallet'); if(!el) return; if(s && s.email){ el.textContent = 'Wallet: R' + ((w[s.email]&&w[s.email].balance)||0).toFixed(2); } else { el.textContent = 'Not logged in'; } }catch(e){} })();
+
+      (function(){ var hb=document.getElementById('hamburger'); var sb=document.getElementById('sidebar'); if(hb && sb){ hb.addEventListener('click', function(){ sb.style.display = (sb.style.display==='block'?'none':'block'); }); } })();
+    </script>
+
+  </body>
+</html>

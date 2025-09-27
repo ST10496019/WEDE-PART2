@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <div class="hamburger" id="hamburger" aria-label="Open menu">☰</div>
+  <div class="sidebar" id="sidebar">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SoccerHub - Home</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <h2 class="brand">SoccerHub</h2>
+  <div id="sidebarWallet" class="small muted" style="margin:6px 0">Not logged in</div>
+  <nav>
+  <a href="index.html">Home</a>
+  <a href="matches.html">Matches</a>
+  <a href="updates.html">Updates</a>
+  <a href="mybets.html">My Bets</a>
+  <a href="account.html">Account</a>
+  </nav>
+</div>
+
+<!-- Main Content -->
+<div class="main">
+  <h1>Welcome to SoccerHub!</h1>
+  <p>Bet on your favorite soccer matches, view upcoming fixtures, and track your bets in real-time with our modern Betway-style interface. Enjoy a sleek, interactive, and easy-to-use platform to maximize your betting experience.</p>
+  <div style="margin-top:40px;">
+  <a class="btn btn-accent" href="matches.html" style="margin-right:12px;">View Matches</a>
+  <a class="btn btn-accent" href="updates.html" style="margin-right:12px;">View Updates</a>
+  <a class="btn btn-danger" href="mybets.html" style="margin-right:12px;">My Bets</a>
+  <a class="btn" href="account.html">Account</a>
+  </div>
+</div>
+
+<script>
+  /*
+    index.html script helpers
+
+    - Sidebar wallet updater: reads 'session' and 'wallets' from localStorage and updates
+      the `#sidebarWallet` element with the logged-in user's balance. This is a UI-only
+      convenience and does not perform any server-side validation.
+
+    - Hamburger toggle: small-screen helper that shows/hides the sidebar when the
+      hamburger button is clicked. Minimal, DOM-only logic for responsiveness.
+  */
+
+  (function(){
+    try{
+      var s = JSON.parse(localStorage.getItem('session')||'null');
+      var w = JSON.parse(localStorage.getItem('wallets')||'{}');
+      var el = document.getElementById('sidebarWallet');
+      if(!el) return;
+      if(s && s.email){
+        // Display the user's wallet balance when logged in
+        el.textContent = 'Wallet: R' + ((w[s.email]&&w[s.email].balance)||0).toFixed(2);
+      } else {
+        el.textContent = 'Not logged in';
+      }
+    }catch(e){}
+  })();
+
+  // hamburger toggle for small screens — toggles the sidebar display
+  (function(){
+    var hb = document.getElementById('hamburger');
+    var sb = document.getElementById('sidebar');
+    if(hb && sb){
+      hb.addEventListener('click', function(){ sb.style.display = (sb.style.display==='block' ? 'none' : 'block'); });
+    }
+  })();
+</script>
+
+</body>
+</html>

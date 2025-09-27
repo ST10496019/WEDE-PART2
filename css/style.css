@@ -1,0 +1,116 @@
+/* Modern theme */
+:root{
+  --bg:#0f1720; /* deep navy */
+  --panel:#0f2430; /* slightly lighter panel */
+  --card:#112132; /* cards */
+  --accent:#21b6a8; /* mint accent */
+  --accent-2:#16a085;
+  --danger:#ff6b6b;
+  --muted:#9fb0b6;
+  --text:#eef6f7;
+  --glass: rgba(255,255,255,0.03);
+}
+
+html,body{height:100%;}
+body{
+  margin:0;
+  font-family: Inter, 'Segoe UI', Tahoma, sans-serif;
+  background: radial-gradient(1200px 800px at 10% 10%, rgba(33,182,168,0.06), transparent 8%), linear-gradient(180deg,#07121a 0%, #0f1720 100%);
+  color:var(--text);
+  -webkit-font-smoothing:antialiased;
+}
+
+/* Sidebar */
+.sidebar{
+  position:fixed; left:0; top:0;
+  width:240px; height:100%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border-right: 1px solid rgba(255,255,255,0.03);
+  padding:28px 18px;
+}
+.brand{color:var(--accent); text-align:center; margin-bottom:20px; font-size:20px; font-weight:700}
+.sidebar #sidebarWallet{padding:8px 10px; border-radius:8px; background:var(--glass); display:inline-block; margin:6px 0 14px 0}
+.sidebar nav a{display:block; color:var(--text); padding:10px 14px; text-decoration:none; font-weight:600; margin-bottom:6px; border-radius:8px; transition:all .15s ease}
+.sidebar nav a:hover{background:rgba(255,255,255,0.02); transform:translateX(4px)}
+
+/* Layout */
+.main{margin-left:240px; padding:48px 36px; max-width:1200px}
+.main--compact{margin-left:240px; margin-right:360px; padding:28px}
+.panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.006)); padding:18px; margin-bottom:16px; border-radius:14px; box-shadow:0 10px 30px rgba(2,6,23,0.6); border:1px solid rgba(255,255,255,0.02); backdrop-filter: blur(4px)}
+
+/* Headings & text */
+h1, h2, h3, h4{color:var(--accent); margin:0 0 10px 0}
+p{color:var(--muted); font-size:15px; max-width:760px; line-height:1.6}
+
+/* Buttons */
+.btn{padding:10px 16px; border-radius:12px; text-decoration:none; font-weight:800; border:none; cursor:pointer; transition:transform .12s ease, box-shadow .12s ease, opacity .12s ease}
+.btn:focus{outline:2px solid rgba(255,255,255,0.04); outline-offset:3px}
+.btn:active{transform:translateY(1px) scale(0.998)}
+.btn-accent{background:linear-gradient(90deg,var(--accent),var(--accent-2)); color:#032827; box-shadow:0 10px 28px rgba(33,182,168,0.12); border:1px solid rgba(255,255,255,0.02)}
+.btn-accent:hover{transform:translateY(-3px); box-shadow:0 16px 38px rgba(33,182,168,0.14)}
+.btn-danger{background:linear-gradient(90deg,#ff7b7b,#ff5a5a); color:#111; box-shadow:0 8px 26px rgba(255,107,107,0.10); border:1px solid rgba(255,255,255,0.02)}
+.btn-danger:hover{transform:translateY(-3px); box-shadow:0 14px 34px rgba(255,107,107,0.12)}
+.small-btn{padding:7px 12px; border-radius:10px}
+
+/* accessible focus ring */
+.btn:focus-visible{box-shadow:0 0 0 6px rgba(33,182,168,0.08)}
+
+/* Matches layout */
+.match-row{display:flex; align-items:center; justify-content:space-between; gap:16px}
+.match-teams{display:flex; align-items:center}
+.team-logo{width:56px; height:56px; margin-right:10px; border-radius:8px; object-fit:cover}
+
+/* Market buttons (goals, corners, etc.) */
+.market-btn{padding:8px 12px; margin-right:8px; border-radius:10px; background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.006)); color:var(--text); border:1px solid rgba(255,255,255,0.03); cursor:pointer; transition:all .12s ease; box-shadow:0 6px 16px rgba(2,6,23,0.45)}
+.market-btn:hover{background:linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01)); transform:translateY(-3px); box-shadow:0 12px 26px rgba(2,6,23,0.5)}
+
+/* Bet item logo in slip */
+.bet-item{display:flex; align-items:center; gap:12px}
+.bet-item .logo{width:40px; height:40px; border-radius:8px; object-fit:cover}
+
+/* Bet slip */
+#betSlip{position:fixed; right:0; top:0; width:360px; height:100%; background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005)); padding:22px; box-shadow:-6px 0 30px rgba(2,6,23,0.6); overflow-y:auto; border-left:1px solid rgba(255,255,255,0.02)}
+#bets, #mybets{list-style:none; padding:0; margin:0}
+
+/* Inputs */
+input[type=number]{width:100px; padding:8px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:transparent; color:var(--text)}
+
+.muted{color:var(--muted)}
+.text-accent{color:var(--accent)}
+
+/* small responsive tweaks */
+@media(max-width:1000px){
+  .main--compact{margin-right:0}
+  #betSlip{position:fixed; right:0; width:320px}
+}
+
+@media(max-width:720px){
+  /* hide desktop sidebar but allow toggle via JS */
+  .sidebar{display:none}
+  .main, .main--compact{margin-left:20px; margin-right:20px}
+  /* bet slip becomes a bottom sheet on phones */
+  #betSlip{position:fixed; right:0; width:100%; height:40vh; bottom:0; top:auto; border-left:none; border-top:1px solid rgba(255,255,255,0.03); border-top-left-radius:12px; border-top-right-radius:12px}
+  /* make buttons and inputs touch-friendly */
+  .market-btn{display:block; width:100%; margin-bottom:8px}
+  input[type=number], input[type=text], input[type=password]{width:100%}
+  .btn{width:100%; display:block}
+  .team-logo{width:44px; height:44px}
+}
+
+/* mobile hamburger button (visible only on small screens) */
+.hamburger{display:none}
+@media(max-width:720px){
+  .hamburger{display:flex; position:fixed; left:12px; top:12px; z-index:120; align-items:center; justify-content:center; width:44px; height:44px; background:var(--glass); border-radius:8px; border:1px solid rgba(255,255,255,0.03); cursor:pointer}
+}
+
+/* Close button for bet slip (appears on small screens) */
+.bet-close{display:none}
+@media(max-width:720px){ .bet-close{display:inline-block; position:absolute; right:14px; top:12px} }
+
+/* subtle list item polish */
+li.panel{padding:12px; border-radius:10px; margin-bottom:10px}
+
+/* small utility */
+.small{font-size:0.9rem}
+
+/* End of file */

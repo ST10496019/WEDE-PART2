@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>SoccerHub - Account</title>
+    <link rel="stylesheet" href="css/style.css">
+  </head>
+  <body>
+    <div class="hamburger" id="hamburger" aria-label="Open menu">☰</div>
+    <div class="sidebar" id="sidebar">
+      <h2 class="brand">SoccerHub</h2>
+  <div id="sidebarWallet" class="small muted" style="margin:6px 0">Not logged in</div>
+      <nav>
+        <a href="index.html">Home</a>
+        <a href="matches.html">Matches</a>
+        <a href="updates.html">Updates</a>
+        <a href="mybets.html">My Bets</a>
+        <a href="account.html">Account</a>
+      </nav>
+    </div>
+
+    <main class="main">
+      <h1>Account</h1>
+
+      <div class="panel" style="max-width:520px;">
+        <h3>Login</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="loginEmail" placeholder="Email" style="flex:1" />
+          <input id="loginPassword" type="password" placeholder="Password" style="flex:1" />
+        </div>
+        <div style="margin-top:10px">
+          <button class="btn btn-accent" onclick="login()">Log in</button>
+        </div>
+        <p id="loginMsg" class="muted" style="margin-top:8px"></p>
+      </div>
+
+      <div class="panel" style="max-width:520px; margin-top:20px">
+        <h3>Register</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="regName" placeholder="Full name" style="flex:1" />
+          <input id="regEmail" placeholder="Email" style="flex:1" />
+          <input id="regPassword" type="password" placeholder="Password" style="flex:1" />
+        </div>
+        <div style="margin-top:10px">
+          <button class="btn btn-accent" onclick="register()">Create account</button>
+        </div>
+        <p id="regMsg" class="muted" style="margin-top:8px"></p>
+      </div>
+
+      <div class="panel" style="max-width:520px; margin-top:20px">
+        <h3>Current Session</h3>
+        <p id="sessionInfo">Not logged in.</p>
+        <button class="btn btn-danger" onclick="logout()">Log out</button>
+      </div>
+
+      <div id="walletPanel" class="panel" style="max-width:520px; margin-top:20px; display:none">
+        <h3>Your Wallet</h3>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="font-size:1.25rem;font-weight:700">Balance: <span id="walletBalance">0.00</span></div>
+          <div style="margin-left:auto" class="small muted">Live updates after each transaction</div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <input id="depositAmount" placeholder="Amount to deposit" style="flex:1" />
+          <button class="btn btn-accent" onclick="deposit()">Deposit</button>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input id="withdrawAmount" placeholder="Amount to withdraw" style="flex:1" />
+          <button class="btn" onclick="withdraw()">Withdraw</button>
+        </div>
+
+        <p id="walletMsg" class="muted" style="margin-top:8px"></p>
+      </div>
+
+    </main>
+
+    <script>
+      /*
+        account.html - lightweight localStorage-backed account and wallet demo
+
+        Responsibilities:
+        - Provide register/login flows that persist to `users` and `session` in localStorage.
+        - Maintain per-user wallets in `wallets` and provide deposit/withdraw demo actions.
+        - Record activities to `activityLog` for visibility on the updates page.
+
+        Important: This is a client-side demo only. Do NOT use for production authentication.
+      */
+
+      // User storage helpers
+      function getUsers(){ try{ return JSON.parse(localStorage.getItem('users')||'[]'); }catch(e){ return []; } }
+      function saveUsers(u){ localStorage.setItem('users', JSON.stringify(u)); }
+
+      // register: create a simple user object and persist locally
+      function register(){
+        var name = document.getElementById('regName').value.trim();
+        var email = document.getElementById('regEmail').value.trim().toLowerCase();
+        var pw = document.getElementById('regPassword').value;
+        var msg = document.getElementById('regMsg');
+        if(!name || !email || !pw){ msg.textContent = 'All fields are required.'; return; }
+        var users = getUsers();
+        if(users.find(u=>u.email===email)){ msg.textContent = 'Account already exists for that email.'; return; }
+        users.push({name:name,email:email,password:pw,created:new Date().toISOString()});
+        saveUsers(users);
+        msg.textContent = 'Account created. You may now log in.';
+        document.getElementById('regName').value=''; document.getElementById('regEmail').value=''; document.getElementById('regPassword').value='';
+      }
+
+      // login: set a `session` object in localStorage for the demo session
+      function login(){
+        var email = document.getElementById('loginEmail').value.trim().toLowerCase();
+        var pw = document.getElementById('loginPassword').value;
+        var msg = document.getElementById('loginMsg');
+        var users = getUsers();
+        var user = users.find(u=>u.email===email && u.password===pw);
+        if(!user){ msg.textContent = 'Invalid email or password.'; return; }
+        localStorage.setItem('session', JSON.stringify({email:user.email,name:user.name,ts:new Date().toISOString()}));
+        msg.textContent = 'Logged in as ' + user.name;
+        renderSession();
+      }
+
+      function logout(){ localStorage.removeItem('session'); renderSession(); }
+
+      // renderSession: reflect the current session in the UI and ensure the wallet panel is visible when logged in
+      function renderSession(){
+        var s = localStorage.getItem('session');
+        var el = document.getElementById('sessionInfo');
+        if(!s){ el.textContent = 'Not logged in.'; updateWalletDisplay(); return; }
+        try{ var obj = JSON.parse(s); el.textContent = 'Logged in: ' + obj.name + ' ('+obj.email+')'; } catch(e){ el.textContent = 'Not logged in.'; }
+        updateWalletDisplay();
+      }
+
+      // Wallet helpers: store balances per-user by email (simple object map)
+      function getWallets(){ try{ return JSON.parse(localStorage.getItem('wallets')||'{}'); }catch(e){ return {}; } }
+      function saveWallets(w){ localStorage.setItem('wallets', JSON.stringify(w)); }
+
+      function ensureUserWallet(email){ var ws = getWallets(); if(!ws[email]){ ws[email] = { balance: 0 }; saveWallets(ws); } }
+
+      function getCurrentSession(){ try{ return JSON.parse(localStorage.getItem('session')||'null'); }catch(e){ return null; } }
+
+      // updateWalletDisplay: show current user's wallet balance and reveal wallet panel
+      function updateWalletDisplay(){ var s = getCurrentSession(); if(!s){ document.getElementById('walletPanel').style.display='none'; return; } var ws = getWallets(); ensureUserWallet(s.email); var bal = (ws[s.email] && ws[s.email].balance) || 0; document.getElementById('walletBalance').textContent = parseFloat(bal).toFixed(2); document.getElementById('walletPanel').style.display='block'; }
+
+      // deposit / withdraw: demo flows that modify the current user's wallet and record activity
+      function deposit(){ var amt = parseFloat(document.getElementById('depositAmount').value); var msg = document.getElementById('walletMsg'); if(isNaN(amt) || amt<=0){ msg.textContent='Enter a valid positive amount to deposit.'; return; } var s = getCurrentSession(); if(!s){ msg.textContent='Please login to deposit.'; return; } var ws = getWallets(); ensureUserWallet(s.email); ws[s.email].balance = (parseFloat(ws[s.email].balance)||0) + amt; saveWallets(ws); msg.textContent = 'Deposit successful.'; document.getElementById('depositAmount').value=''; updateWalletDisplay(); addActivity('Deposit', s.email, amt); }
+
+      function withdraw(){ var amt = parseFloat(document.getElementById('withdrawAmount').value); var msg = document.getElementById('walletMsg'); if(isNaN(amt) || amt<=0){ msg.textContent='Enter a valid positive amount to withdraw.'; return; } var s = getCurrentSession(); if(!s){ msg.textContent='Please login to withdraw.'; return; } var ws = getWallets(); ensureUserWallet(s.email); var cur = parseFloat(ws[s.email].balance)||0; if(amt>cur){ msg.textContent = 'Insufficient funds.'; return; } ws[s.email].balance = cur - amt; saveWallets(ws); msg.textContent = 'Withdrawal successful.'; document.getElementById('withdrawAmount').value=''; updateWalletDisplay(); addActivity('Withdraw', s.email, amt); }
+
+      // activity log helper used elsewhere - records actions and triggers updates page render
+      function addActivity(action, email, amount){ try{ var logs = JSON.parse(localStorage.getItem('activityLog')||'[]'); }catch(e){ logs = []; } logs.unshift({msg: action + ' • ' + email + (amount?(' • '+amount):''), ts: new Date().toISOString()}); localStorage.setItem('activityLog', JSON.stringify(logs)); renderUpdates(); }
+
+      // init: reflect current session on load
+      renderSession();
+    </script>
+
+    <script>
+      (function(){ try{ var s=JSON.parse(localStorage.getItem('session')||'null'); var w=JSON.parse(localStorage.getItem('wallets')||'{}'); var el=document.getElementById('sidebarWallet'); if(!el) return; if(s && s.email){ el.textContent = 'Wallet: R' + ((w[s.email]&&w[s.email].balance)||0).toFixed(2); } else { el.textContent = 'Not logged in'; } }catch(e){} })();
+
+      (function(){ var hb=document.getElementById('hamburger'); var sb=document.getElementById('sidebar'); if(hb && sb){ hb.addEventListener('click', function(){ sb.style.display = (sb.style.display==='block'?'none':'block'); }); } })();
+    </script>
+
+    </body>
+  </html>

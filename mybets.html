@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>SoccerHub - My Bets</title>
+    <link rel="stylesheet" href="css/style.css">
+  </head>
+  <body>
+    <div class="hamburger" id="hamburger" aria-label="Open menu">☰</div>
+    <div class="sidebar" id="sidebar">
+      <h2 class="brand">SoccerHub</h2>
+  <div id="sidebarWallet" class="small muted" style="margin:6px 0">Not logged in</div>
+      <script>
+        /*
+          mybets.html - displays saved bets and provides cashout/settle/remove actions.
+
+          Responsibilities:
+          - Read the authoritative `betSlip` from localStorage and render each bet.
+          - Compute the automatic win boost and show boosted potentials.
+          - Provide demo actions: cashout (simulated market), settle (mark win/lose), remove.
+          - Persist wallet changes and activity logs when actions affect balances.
+          - Sync UI across tabs using the storage event.
+
+          Important: this is a client-side demo. Wallets/sessions are stored locally and are
+          not secure. All monetary flows are simulated for demo purposes only.
+        */
+
+        // single global betSlip stored in localStorage (authoritative source)
+        var betSlip = JSON.parse(localStorage.getItem('betSlip') || '[]');
+
+        // automatic 7% per selection win boost
+        function computeWinBoost(){ return 7 * (betSlip.length || 0); }
+
+        // renderMyBets: re-reads betSlip and builds the visible list of saved bets
+        // - shows status (open/settled), potential, boosted potential
+        // - provides cashout, settle and remove actions (demo-only)
+        function renderMyBets() {
+          // always refresh the in-memory betSlip from storage to stay up-to-date
+          try{ betSlip = JSON.parse(localStorage.getItem('betSlip') || '[]'); }catch(e){ betSlip = []; }
+          var list = document.getElementById('mybets');
+          var total = document.getElementById('total');
+          list.innerHTML = '';
+          var totalWin = 0;
+
+          betSlip.forEach(function(bet, index) {
+              var potential = (bet.stake||0) * bet.odds;
+              var boosted = potential * (1 + computeWinBoost()/100);
+            var li = document.createElement('li');
+            li.className = 'panel';
+              // status display (open vs settled)
+              var status = bet.status || 'open';
+              var statusLine = '';
+              if(status === 'open'){
+                statusLine = '<div class="muted">Status: OPEN</div>';
+              } else if(status === 'settled'){
+                statusLine = '<div class="muted">Status: SETTLED • Result: '+(bet.result||'')+' • Payout: R'+(bet.payout?parseFloat(bet.payout).toFixed(2):'0.00')+'</div>';
+              }
+
+              li.innerHTML = '<div class="bet-item">' +
+                             '<img src="'+(bet.logoA||'')+'" class="logo" alt="logo">' +
+                             '<img src="'+(bet.logoB||'')+'" class="logo" alt="logo">' +
+                             '<div><div><strong>'+ (bet.teamA || '') + (bet.teamB ? ' vs ' + bet.teamB : '') + '</strong></div>' +
+                             '<div class="muted">Market: '+(bet.market||'Match')+' • Odds: '+bet.odds+'</div>' +
+                             '<div style="margin-top:6px">Stake: R'+(bet.stake||0)+'</div>' +
+                             '<div style="margin-top:6px">Potential: R'+ potential.toFixed(2) + (computeWinBoost() ? (' • Boosted: R' + boosted.toFixed(2)) : '') +'</div>' + statusLine + '</div></div>' +
+                             '<div style="margin-top:8px;display:flex;gap:8px">' +
+                               (status==='open' ? ('<button onclick="settleBet('+index+', \"win\")" class="btn small-btn">Settle Win</button><button onclick="settleBet('+index+', \"lose\")" class="btn small-btn">Settle Lose</button>') : '') +
+                               '<button onclick="cashout(' + index + ')" class="btn small-btn">Cashout</button>' +
+                               '<button onclick="removeBet(' + index + ')" class="btn small-btn btn-danger">Remove</button>' +
+                             '</div>';
+            totalWin += boosted;
+            list.appendChild(li);
+          });
+
+          total.textContent = 'Total Potential Win: R' + totalWin.toFixed(2);
+          var disp = document.getElementById('winBoostDisplay'); if(disp) disp.textContent = 'Win Boost: ' + computeWinBoost() + '%';
+        }
+
+        // Wallet/session helpers for cashout (small utilities used by actions below)
+        function getSession(){ try{ return JSON.parse(localStorage.getItem('session')||'null'); }catch(e){ return null; } }
+        function getWallets(){ try{ return JSON.parse(localStorage.getItem('wallets')||'{}'); }catch(e){ return {}; } }
+        function saveWallets(w){ localStorage.setItem('wallets', JSON.stringify(w)); }
+        function ensureUserWallet(email){ var ws = getWallets(); if(!ws[email]){ ws[email] = { balance: 0 }; saveWallets(ws); } }
+
+        function addActivity(action, email, amount){ try{ var logs = JSON.parse(localStorage.getItem('activityLog')||'[]'); }catch(e){ logs = []; } logs.unshift({msg: action + ' • ' + (email||'guest') + (amount?(' • ' + amount):''), ts: new Date().toISOString()}); localStorage.setItem('activityLog', JSON.stringify(logs)); }
+
+        // cashout: simulate a market cashout and credit the user's wallet (demo)
+        function cashout(index){ var bet = betSlip[index]; if(!bet){ return; } var potential = (bet.stake||0) * bet.odds; var boosted = potential * (1 + computeWinBoost()/100);
+            // estimate cashout between 65% and 90% of boosted potential to simulate market
+            var factor = 0.65 + Math.random() * 0.25; var cash = parseFloat((boosted * factor).toFixed(2));
+            // remove bet
+            betSlip.splice(index,1); localStorage.setItem('betSlip', JSON.stringify(betSlip));
+            // credit to wallet if logged in
+            var s = getSession(); if(s && s.email){ ensureUserWallet(s.email); var ws = getWallets(); ws[s.email].balance = (parseFloat(ws[s.email].balance)||0) + cash; saveWallets(ws); addActivity('Cashout', s.email, cash); document.getElementById('cashoutMsg').textContent = 'Cashout successful: R' + cash.toFixed(2) + ' credited to your wallet.'; }
+            else { addActivity('Cashout (guest)', null, cash); document.getElementById('cashoutMsg').textContent = 'Cashout successful: R' + cash.toFixed(2) + ' (not logged in — create an account to save funds).'; }
+            renderMyBets();
+          }
+
+        // removeBet: delete a stored bet and re-render
+        function removeBet(index) {
+          betSlip.splice(index, 1);
+          localStorage.setItem('betSlip', JSON.stringify(betSlip));
+          renderMyBets();
+        }
+
+        // settle a bet (demo): mark as won or lost, compute payout and credit wallet if logged in
+        function settleBet(index, result){
+          var bet = betSlip[index]; if(!bet) return;
+          bet.status = 'settled'; bet.result = result; bet.settledAt = new Date().toISOString();
+          var stake = parseFloat(bet.stake)||0; var payout = 0;
+          if(result === 'win'){
+            payout = stake * parseFloat(bet.odds||1);
+            // credit wallet if logged in
+            try{ var s = JSON.parse(localStorage.getItem('session')||'null'); if(s && s.email){ var ws = JSON.parse(localStorage.getItem('wallets')||'{}'); ws[s.email] = ws[s.email]||{balance:0}; ws[s.email].balance = (parseFloat(ws[s.email].balance)||0) + payout; localStorage.setItem('wallets', JSON.stringify(ws)); addActivity('Settle Win', s.email, payout); } else { addActivity('Settle Win (guest)', null, payout); } }catch(e){}
+          } else {
+            payout = 0; addActivity('Settle Lose', (JSON.parse(localStorage.getItem('session')||'null')||{}).email || null, 0);
+          }
+          bet.payout = payout;
+          localStorage.setItem('betSlip', JSON.stringify(betSlip));
+          renderMyBets();
+        }
+
+        // If matches were updated elsewhere, attempt to sync stored bets (names/logos)
+        function syncStoredBets(){
+          try{ var stored = JSON.parse(localStorage.getItem('betSlip') || '[]'); }catch(e){ stored = []; }
+          var updated = false;
+          // We don't have the full matches array here, but we'll normalize common name variants
+          var nameMap = {
+            'REAL M': 'REAL Madrid',
+            'MAN U': 'Man United',
+            'BC FC': 'Barcelona FC',
+            'Updated Sundowns': 'Sundowns'
+          };
+          stored = stored.map(function(b){
+            var changed = false;
+            var newTeamA = nameMap[b.teamA] || b.teamA;
+            var newTeamB = nameMap[b.teamB] || b.teamB;
+            if(newTeamA !== b.teamA || newTeamB !== b.teamB) changed = true;
+            if(changed) updated = true;
+            return Object.assign({}, b, {teamA: newTeamA, teamB: newTeamB});
+          });
+          if(updated){ localStorage.setItem('betSlip', JSON.stringify(stored)); betSlip = stored; }
+        }
+
+        // initial render
+        syncStoredBets();
+        renderMyBets();
+
+
+        // keep in sync across tabs: when localStorage.betSlip changes elsewhere re-render
+        window.addEventListener('storage', function(e){
+          if(!e) return;
+          if(e.key === 'betSlip'){
+            try{ betSlip = JSON.parse(localStorage.getItem('betSlip') || '[]'); }catch(err){ betSlip = []; }
+            syncStoredBets(); renderMyBets();
+          }
+          if(e.key === 'activityLog' || e.key === 'wallets'){
+            // refresh UI if activity or wallet changed elsewhere
+            renderMyBets();
+          }
+        });
+      </script>
+      <script>
+        /*
+          Per-page UI helpers
+
+          - Sidebar wallet updater: updates `#sidebarWallet` with the logged-in user's balance
+          - Hamburger toggle: small-screen sidebar show/hide
+        */
+        (function(){ try{ var s=JSON.parse(localStorage.getItem('session')||'null'); var w=JSON.parse(localStorage.getItem('wallets')||'{}'); var el=document.getElementById('sidebarWallet'); if(!el) return; if(s && s.email){ el.textContent = 'Wallet: R' + ((w[s.email]&&w[s.email].balance)||0).toFixed(2); } else { el.textContent = 'Not logged in'; } }catch(e){} })();
+
+        // hamburger toggle for small screens
+        (function(){ var hb=document.getElementById('hamburger'); var sb=document.getElementById('sidebar'); if(hb && sb){ hb.addEventListener('click', function(){ sb.style.display = (sb.style.display==='block'?'none':'block'); }); } })();
+      </script>
+        if(e.key === 'betSlip'){
+          try{ betSlip = JSON.parse(localStorage.getItem('betSlip') || '[]'); }catch(err){ betSlip = []; }
+          syncStoredBets(); renderMyBets();
+        }
+        if(e.key === 'activityLog' || e.key === 'wallets'){
+          // refresh UI if activity or wallet changed elsewhere
+          renderMyBets();
+        }
+      });
+    </script>
+    <script>
+      // sidebar wallet updater (per-page)
+      (function(){ try{ var s=JSON.parse(localStorage.getItem('session')||'null'); var w=JSON.parse(localStorage.getItem('wallets')||'{}'); var el=document.getElementById('sidebarWallet'); if(!el) return; if(s && s.email){ el.textContent = 'Wallet: R' + ((w[s.email]&&w[s.email].balance)||0).toFixed(2); } else { el.textContent = 'Not logged in'; } }catch(e){} })();
+
+      // hamburger toggle for small screens
+      (function(){ var hb=document.getElementById('hamburger'); var sb=document.getElementById('sidebar'); if(hb && sb){ hb.addEventListener('click', function(){ sb.style.display = (sb.style.display==='block'?'none':'block'); }); } })();
+    </script>
+
+  </body>
+
+</html>

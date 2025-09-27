@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Matches</title>
+    <link rel="stylesheet" href="css/style.css">
+  </head>
+  <body>
+  <div class="hamburger" id="hamburger" aria-label="Open menu">☰</div>
+  <div class="sidebar" id="sidebar">
+      <h2 class="brand">SoccerHub</h2>
+  <div id="sidebarWallet" class="small muted" style="margin:6px 0">Not logged in</div>
+      <nav>
+        <a href="index.html">Home</a>
+        <a href="matches.html">Matches</a>
+        <a href="updates.html">Updates</a>
+        <a href="mybets.html">My Bets</a>
+        <a href="account.html">Account</a>
+      </nav>
+    </div>
+
+    <main class="main--compact">
+      <h1>Upcoming Matches</h1>
+      <div id="matches"></div>
+    </main>
+
+    <aside id="betSlip">
+  <button class="bet-close btn small-btn" id="betClose" aria-label="Close bet slip">Close</button>
+      <h3 class="text-accent">Bet Slip</h3>
+      <div id="winBoostDisplay" class="muted" style="margin-bottom:8px">Win Boost: 0%</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <label class="small">Mode:</label>
+        <select id="betModeSelect" onchange="setBetMode(this.value)">
+          <option value="SINGLE">Singles</option>
+          <option value="PARLAY">Parlay (Multiple)</option>
+        </select>
+      </div>
+      <div id="parlayControls" style="display:none;margin-bottom:8px">
+        <div style="display:flex;gap:8px">
+          <input id="parlayStake" type="number" min="0" placeholder="Parlay stake" style="flex:1" oninput="updateParlayStake(this.value)" />
+          <button class="btn btn-accent" onclick="placeParlay()">Place Parlay</button>
+        </div>
+      </div>
+      <ul id="bets"></ul>
+      <p id="total" class="text-accent">Total Potential Win: R0.00</p>
+    </aside>
+
+    <script>
+  /*
+    matches.html - client-side betting UI
+
+    Responsibilities in this script:
+    - Maintain a client-local bet slip (stored in localStorage)
+    - Render the list of matches and market buttons
+    - Render the right-hand bet slip in SINGLE and PARLAY modes
+    - Compute the automatic win boost and boosted potentials
+    - Sync changes across tabs using the storage event
+    - Provide a small-screen hamburger toggle for the sidebar
+
+    Notes on data shapes:
+    - betSlip: Array of { matchId, teamA, teamB, market, odds, stake, logoA, logoB, status, payout }
+    - matches: Array of match objects with id, teamA, teamB, odds, logoA, logoB, markets[]
+  */
+
+  // global betSlip persisted in localStorage (authoritative source for bets)
+  var betSlip = JSON.parse(localStorage.getItem('betSlip') || '[]');
+  // stored win boost value (kept for compatibility; computeWinBoost reads betSlip length)
+  var winBoost = parseFloat(localStorage.getItem('winBoost') || '0') || 0;
+
+  // Seeded match data (used to render match cards and market buttons)
+  var matches = [
+        {id:1, teamA:'PSG', teamB:'REAL Madrid', odds:1.8, logoA:'img/PSG-Logo.png', logoB:'img/REAL M.png', markets:[
+          {key:'match', label:'PSG', odds:1.80},
+          {key:'match', label:'Real Madrid', odds:2.00},
+          {key:'1plus', label:'Over 1+', odds:2.30},
+          {key:'btts', label:'BTTS', odds:1.90},
+          {key:'over2.5', label:'Over 2.5 Goals', odds:2.90}
+        ]},
+        {id:2, teamA:'Man United', teamB:'BM', odds:2.1, logoA:'img/MAN U.png', logoB:'img/BM.png', markets:[
+          {key:'match', label:'Man United', odds:2.10},
+          {key:'match', label:'BM', odds:2.30},
+          {key:'1plus', label:'Over 1+', odds:2.50},
+          {key:'btts', label:'BTTS', odds:1.95},
+          {key:'over2.5', label:'Over 2.5 Goals', odds:2.20}
+        ]},
+        {id:3, teamA:'Barcelona FC', teamB:'Sundowns', odds:2.5, logoA:'img/BC FC.png', logoB:'img/Updated-Sundowns-Logo.png', markets:[
+          {key:'match', label:'Barcelona FC', odds:2.50},
+          {key:'match', label:'Sundowns', odds:2.70},
+          {key:'1plus', label:'Over 1+', odds:2.80},
+          {key:'btts', label:'BTTS', odds:2.00},
+          {key:'over2.5', label:'Over 2.5 Goals', odds:2.40}
+        ]}
+      ];
+
+  // renderMatches: build DOM for each match card and attach market buttons
+  // - left column: team logos and names
+  // - right column: market buttons (each button calls addToBet)
+  function renderMatches(){
+        var container = document.getElementById('matches');
+        container.innerHTML = '';
+        matches.forEach(function(m){
+          var card = document.createElement('div');
+          card.className = 'panel';
+
+          // left: teams and logos
+          var left = document.createElement('div');
+          left.className = 'match-teams';
+          left.innerHTML = '<img src="'+m.logoA+'" class="team-logo" alt="'+m.teamA+'">' +
+                           '<div style="margin-right:10px"><strong>'+m.teamA+'</strong></div>' +
+                           '<div style="margin:0 10px">vs</div>' +
+                           '<img src="'+m.logoB+'" class="team-logo" alt="'+m.teamB+'">' +
+                           '<div style="margin-left:10px"><strong>'+m.teamB+'</strong></div>';
+
+          // right: markets
+          var right = document.createElement('div');
+          var base = document.createElement('div');
+          base.className = 'muted';
+          base.textContent = 'Base: ' + m.odds;
+          right.appendChild(base);
+
+          var marketsDiv = document.createElement('div');
+          marketsDiv.style.marginTop = '8px';
+          // create a button for each market
+          m.markets.forEach(function(mt){
+            var btn = document.createElement('button');
+            btn.className = 'market-btn';
+            var txt = document.createTextNode(mt.label + ' (' + mt.odds.toFixed(2) + ')');
+            btn.appendChild(txt);
+            // set inline onclick to keep simple single-file approach
+            btn.setAttribute('onclick', 'addToBet('+m.id+', "' + mt.label.replace(/"/g, '\\"') + '", ' + mt.odds + ')');
+            marketsDiv.appendChild(btn);
+          });
+          right.appendChild(marketsDiv);
+
+          var row = document.createElement('div');
+          row.className = 'match-row';
+          row.appendChild(left);
+          row.appendChild(right);
+
+          card.appendChild(row);
+          container.appendChild(card);
+        });
+      }
+
+  // computeWinBoost: automatic 7% per active selection in the bet slip
+  // returns a percentage (e.g., 14 for two selections)
+  function computeWinBoost(){ return 7 * (betSlip.length || 0); }
+  // Bet mode and parlay helpers
+  var betMode = localStorage.getItem('betMode') || 'SINGLE';
+  var parlayStake = parseFloat(localStorage.getItem('parlayStake')||'0') || 0;
+  // setBetMode / updateParlayStake / placeParlay: UI helpers for PARLAY mode
+  // - setBetMode: switch between SINGLE and PARLAY and persist choice
+  function setBetMode(m){ betMode = m || 'SINGLE'; localStorage.setItem('betMode', betMode); var el = document.getElementById('parlayControls'); if(el) el.style.display = (betMode==='PARLAY') ? 'block' : 'none'; renderBetSlip(); }
+  // - updateParlayStake: persist the parlay stake used when placing a multi-leg parlay
+  function updateParlayStake(v){ parlayStake = parseFloat(v) || 0; localStorage.setItem('parlayStake', parlayStake); renderBetSlip(); }
+  // - placeParlay: demo flow that debits the current user's wallet (if logged-in) and places a parlay
+  function placeParlay(){ if(!betSlip.length){ alert('Add at least one selection to place a parlay'); return; } if(!parlayStake || parlayStake<=0){ alert('Enter a valid parlay stake'); return; }
+    // demo: deduct from wallet if available
+    var s = null; try{ s = JSON.parse(localStorage.getItem('session')||'null'); }catch(e){ s=null; }
+    if(s && s.email){ var wallets = JSON.parse(localStorage.getItem('wallets')||'{}'); wallets[s.email] = wallets[s.email] || {balance:0}; if(wallets[s.email].balance < parlayStake){ alert('Insufficient wallet balance for this parlay.'); return; } wallets[s.email].balance -= parlayStake; localStorage.setItem('wallets', JSON.stringify(wallets)); }
+    alert('Parlay placed for R' + parlayStake.toFixed(2)); parlayStake = 0; localStorage.setItem('parlayStake','0'); var inp = document.getElementById('parlayStake'); if(inp) inp.value=''; renderBetSlip(); }
+
+  function renderBetSlip(){
+  // renderBetSlip: reads authoritative betSlip from localStorage and renders
+  // Supports two modes:
+  // - SINGLE: each selection shows its own stake and potential
+  // - PARLAY: displays combined odds and uses a single parlay stake
+  // reload latest stored state so stakes/odds/payouts are always current
+  try{ betSlip = JSON.parse(localStorage.getItem('betSlip')||'[]'); }catch(e){ betSlip = []; }
+  parlayStake = parseFloat(localStorage.getItem('parlayStake')||parlayStake||'0') || 0;
+  var list = document.getElementById('bets');
+    var total = document.getElementById('total');
+    list.innerHTML = '';
+    var totalWin = 0;
+
+    if(betMode === 'PARLAY'){
+  // compute combined odds for the parlay (product of leg odds)
+  var combinedOdds = betSlip.reduce(function(acc,b){ return acc * parseFloat(b.odds||1); }, 1);
+      var parlayPotential = parlayStake * combinedOdds;
+      var winBoost = computeWinBoost();
+      var boostedTotal = parlayPotential * (1 + winBoost/100);
+
+  // render each parlay leg (read-only view of the selections)
+      betSlip.forEach(function(bet, idx){
+        var li = document.createElement('li'); li.className = 'panel';
+        li.innerHTML = '<div class="bet-item">' +
+          '<img src="'+(bet.logoA||'')+'" class="logo" alt="logoA">' +
+          '<img src="'+(bet.logoB||'')+'" class="logo" alt="logoB">' +
+          '<div><div><strong>'+bet.teamA+' vs '+(bet.teamB||'')+'</strong></div>' +
+          '<div class="muted">Market: '+(bet.market||'Match')+' • Odds: '+bet.odds+'</div></div></div>' +
+          '<div style="margin-top:8px"><button class="btn" onclick="removeBet('+idx+')">Remove leg</button></div>';
+        list.appendChild(li);
+      });
+
+  // parlay summary (combined odds, stake, and boosted potential)
+      var summary = document.createElement('li'); summary.className = 'panel';
+      summary.innerHTML = '<div style="font-weight:700">Parlay summary</div><div class="muted">Combined odds: '+combinedOdds.toFixed(2)+'</div><div style="margin-top:6px">Stake: R'+parlayStake.toFixed(2)+'</div><div style="margin-top:6px">Potential: R'+parlayPotential.toFixed(2)+(winBoost?(' • Boosted: R'+boostedTotal.toFixed(2)):'')+'</div>';
+      list.appendChild(summary);
+      total.textContent = 'Total Potential Win: R' + boostedTotal.toFixed(2);
+    } else {
+      // SINGLE mode: each selection allows a per-leg stake input and shows potential
+      betSlip.forEach(function(bet, idx){
+        var li = document.createElement('li');
+        var potential = (bet.stake||0) * bet.odds;
+        var winBoost = computeWinBoost();
+        var boosted = potential * (1 + winBoost/100);
+        li.className = 'panel';
+        li.innerHTML = '<div class="bet-item">' +
+          '<img src="'+(bet.logoA||'')+'" class="logo" alt="logoA">' +
+          '<img src="'+(bet.logoB||'')+'" class="logo" alt="logoB">' +
+          '<div><div><strong>'+bet.teamA+' vs '+(bet.teamB||'')+'</strong></div>' +
+          '<div class="muted">Market: '+(bet.market||'Match')+' • Odds: '+bet.odds+'</div>' +
+          '<div style="margin-top:6px">Stake: R'+(bet.stake||0)+'</div>' +
+          '<div style="margin-top:6px">Potential: R'+ potential.toFixed(2) + (winBoost?(' • Boosted: R'+boosted.toFixed(2)): '') +'</div></div></div>' +
+          '<div style="margin-top:8px"><input type="number" min="0" value="'+(bet.stake||0)+'" onchange="updateStake('+idx+', this.value)"></div>' +
+          '<div style="margin-top:8px"><button class="btn btn-danger" onclick="removeBet('+idx+')">Remove</button></div>';
+  // accumulate boosted potential to show the total potential win for all singles
+  totalWin += boosted;
+        list.appendChild(li);
+      });
+      total.textContent = 'Total Potential Win: R' + totalWin.toFixed(2);
+    }
+    var disp = document.getElementById('winBoostDisplay'); if(disp) disp.textContent = 'Win Boost: ' + computeWinBoost() + '%';
+  }
+
+      function addToBet(id, market, odds){
+        var m = matches.find(function(x){return x.id===id;});
+        if(!m) return;
+        // attach selected market, odds and logos to the bet object and persist
+      betSlip.push({matchId: m.id, teamA:m.teamA, teamB:m.teamB, market:market||'Match Winner', odds:odds||m.odds, stake:0, logoA:m.logoA, logoB:m.logoB, status: 'open'});
+        localStorage.setItem('betSlip', JSON.stringify(betSlip));
+        renderBetSlip();
+      }
+
+      function removeBet(index){
+        betSlip.splice(index,1);
+        localStorage.setItem('betSlip', JSON.stringify(betSlip));
+        renderBetSlip();
+      }
+
+      function updateStake(index, value){
+            var v = parseFloat(value) || 0;
+            if(betMode === 'PARLAY'){
+              alert('Per-leg stakes are ignored in Parlay mode. Use the Parlay stake field to set the total stake.');
+              return;
+            }
+            betSlip[index].stake = v;
+            localStorage.setItem('betSlip', JSON.stringify(betSlip));
+            renderBetSlip();
+      }
+
+      // Ensure any stored bets are synchronized with the current matches (names/logos may have changed)
+      function syncStoredBets(){
+        try{
+          var stored = JSON.parse(localStorage.getItem('betSlip') || '[]');
+        }catch(e){ stored = []; }
+        var updated = false;
+        stored = stored.map(function(b){
+          var m = matches.find(function(x){
+            // match by id if present, otherwise try by team names or logo paths
+            return (x.teamA === b.teamA && x.teamB === b.teamB) || (x.logoA === b.logoA && x.logoB === b.logoB);
+          });
+          if(m){
+                // if we found a matching current match, normalize team names/logos
+                if(b.teamA !== m.teamA || b.teamB !== m.teamB || b.logoA !== m.logoA || b.logoB !== m.logoB){
+                  updated = true;
+                }
+                return Object.assign({}, b, {teamA: m.teamA, teamB: m.teamB, logoA: m.logoA, logoB: m.logoB});
+              }
+          return b;
+        });
+        if(updated){
+          localStorage.setItem('betSlip', JSON.stringify(stored));
+          betSlip = stored;
+          console.log('Stored bets synchronized with current matches');
+        }
+      }
+
+  // initial render: ensure stored bets are synchronized, then render matches and bet slip
+  syncStoredBets();
+  renderMatches();
+  // initialize bet mode UI
+  var modeEl = document.getElementById('betModeSelect'); if(modeEl){ modeEl.value = betMode; }
+  var parlayEl = document.getElementById('parlayControls'); if(parlayEl){ parlayEl.style.display = (betMode==='PARLAY') ? 'block' : 'none'; }
+  var parlayInput = document.getElementById('parlayStake'); if(parlayInput){ parlayInput.value = parlayStake || ''; }
+  renderBetSlip();
+
+      // keep UI in sync when localStorage changes (storage events from other tabs)
+      window.addEventListener('storage', function(e){
+        if(!e) return;
+        if(e.key === 'betSlip'){
+          try{ betSlip = JSON.parse(localStorage.getItem('betSlip')||'[]'); }catch(err){ betSlip = []; }
+          syncStoredBets(); renderBetSlip();
+        }
+        if(e.key === 'wallets'){
+          // update sidebar wallet badge if present
+          try{ var s = JSON.parse(localStorage.getItem('session')||'null'); var ws = JSON.parse(localStorage.getItem('wallets')||'{}'); var el = document.getElementById('sidebarWallet'); if(el){ if(s && s.email) el.textContent = 'Wallet: R' + ((ws[s.email]&&ws[s.email].balance)||0).toFixed(2); else el.textContent='Not logged in'; } }catch(err){}
+        }
+        if(e.key === 'betMode' || e.key === 'parlayStake'){
+          betMode = localStorage.getItem('betMode')||'SINGLE'; parlayStake = parseFloat(localStorage.getItem('parlayStake')||'0')||0;
+          var modeEl = document.getElementById('betModeSelect'); if(modeEl) modeEl.value = betMode;
+          var pEl = document.getElementById('parlayStake'); if(pEl) pEl.value = parlayStake||'';
+          var parlayEl = document.getElementById('parlayControls'); if(parlayEl) parlayEl.style.display = (betMode==='PARLAY') ? 'block' : 'none';
+          renderBetSlip();
+        }
+      });
+
+      // small-screen hamburger toggle: allows users to show/hide the sidebar on mobile
+      (function(){
+        var hb = document.getElementById('hamburger');
+        var sb = document.getElementById('sidebar');
+        var bet = document.getElementById('betSlip');
+        var close = document.getElementById('betClose');
+        if(hb && sb){ hb.addEventListener('click', function(){ sb.style.display = (sb.style.display==='block'?'none':'block'); }); }
+        // Close button temporarily hides the bet sheet (simple UX hack)
+        if(close && bet){ close.addEventListener('click', function(){ bet.style.display='none'; setTimeout(function(){ bet.style.display='block'; }, 100); }); }
+      })();
+    </script>
+  </body>
+    <script>
+      (function(){ try{ var s=JSON.parse(localStorage.getItem('session')||'null'); var w=JSON.parse(localStorage.getItem('wallets')||'{}'); var el=document.getElementById('sidebarWallet'); if(!el) return; if(s && s.email){ el.textContent = 'Wallet: R' + ((w[s.email]&&w[s.email].balance)||0).toFixed(2); } else { el.textContent = 'Not logged in'; } }catch(e){} })();
+    </script>
+    </html>
+
