@@ -1,4 +1,7 @@
-# BetwithBetter
+GITHUB LINK
+https://github.com/ST10496019/WEDE-PART2/tree/master
+
+SPORTHUB
 
 BetwithBetter is a responsive sports betting web application that allows users to view matches, place bets, and track updates in an intuitive and mobile-friendly interface.
 
